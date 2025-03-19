@@ -214,8 +214,15 @@
 
             const abilities = pokemonData.abilities.map(ability => ability.ability.name);
 
+            const normalSprite = pokemonData.sprites.front_default;
+            const shinySprite = pokemonData.sprites.front_shiny;
+
             pokemonStatsDiv.innerHTML = `
                 <div class="stat-title">Stats de ${pokemonName.charAt(0).toUpperCase() + pokemonName.slice(1)}</div>
+                <div class="stat-info">
+                    <img src="${normalSprite}" alt="${pokemonName} normal" style="width: 100px; height: 100px; margin-right: 10px; vertical-align: middle;">
+                    <strong>${pokemonName.charAt(0).toUpperCase() + pokemonName.slice(1)}</strong>
+                </div>
                 <div class="stat-info">HP: ${stats.hp}</div>
                 <div class="stat-info">Attack: ${stats.attack}</div>
                 <div class="stat-info">Defense: ${stats.defense}</div>
@@ -227,6 +234,10 @@
                 <ul>
                     ${abilities.map(ability => `<li>${ability}</li>`).join('')}
                 </ul>
+                <div class="stat-info">
+                    <strong>Sprite Shiny:</strong>
+                    <img src="${shinySprite}" alt="${pokemonName} shiny" style="width: 100px; height: 100px; margin-top: 10px;">
+                </div>
             `;
         }
 
