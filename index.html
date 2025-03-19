@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pokédex</title>
     <style>
-        /* Estilo geral */
-         /* Abrir o arquivo no vs com o live server */
         body {
             font-family: 'Arial', sans-serif;
             background-color: #111;
@@ -39,13 +37,6 @@
             margin-bottom: 20px;
         }
 
-        h2 {
-            margin-top: 20px;
-            font-size: 2em;
-            text-align: center;
-        }
-
-        /* Estilo do campo de pesquisa */
         #searchBox {
             padding: 10px;
             width: 80%;
@@ -59,7 +50,6 @@
             text-align: center;
         }
 
-        /* Estilo do cartão de cada Pokémon */
         .pokemon-list {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -105,7 +95,6 @@
             color: #999;
         }
 
-        /* Estilo para os stats de Pokémon */
         .stat-container {
             margin-top: 20px;
             background-color: #222;
@@ -124,27 +113,6 @@
         .stat-info {
             font-size: 1.2em;
         }
-
-        /* Responsividade */
-        @media (max-width: 768px) {
-            select {
-                font-size: 1em;
-                padding: 8px;
-            }
-
-            .pokemon-item img {
-                width: 80px;
-                height: 80px;
-            }
-
-            .pokemon-name {
-                font-size: 1.3em;
-            }
-
-            .pokemon-id {
-                font-size: 1em;
-            }
-        }
     </style>
 </head>
 <body>
@@ -162,27 +130,16 @@
         <option value="8">Geração 8</option>
     </select>
 
-    <!-- Caixa de Pesquisa -->
     <input type="text" id="searchBox" placeholder="Pesquisar Pokémon..." />
 
-    <!-- Stats de Pokémon -->
-    <div id="pokemonStats" class="stat-container">
-        <!-- Detalhes dos stats do Pokémon serão exibidos aqui -->
-    </div>
+    <div id="pokemonStats" class="stat-container"></div>
 
-    <!-- Lista de Pokémons -->
-    <h2>Pokémons da Geração 1</h2>
-    <div class="pokemon-list" id="pokemonList">
-        <!-- Pokémon será gerado aqui -->
-    </div>
+    <div class="pokemon-list" id="pokemonList"></div>
 
     <script>
-        // Base URL da PokeAPI
         const BASE_URL = "https://pokeapi.co/api/v2/";
+        let currentPokemons = [];
 
-        let currentPokemons = [];  // Variável global para armazenar os Pokémons carregados
-
-        // Função para buscar Pokémons de uma geração
         async function getPokemonsByGeneration(generation) {
             const generationData = await fetch(`${BASE_URL}generation/${generation}/`)
                 .then(response => response.json());
@@ -192,49 +149,37 @@
                 const pokemonData = await fetch(pokemon.url)
                     .then(response => response.json())
                     .then(data => {
-                        // Adiciona o Pokémon no array
                         pokemons.push({ name: pokemon.name, id: data.id });
                     });
             }
-
-            // Ordena os Pokémons pelo ID
-            pokemons = pokemons.sort((a, b) => a.id - b.id);
-
             return pokemons;
         }
 
-        // Função para exibir Pokémon de uma geração
         async function mostrarPokemons(geracao) {
             const pokemonListDiv = document.getElementById('pokemonList');
-            pokemonListDiv.innerHTML = ''; // Limpar lista atual
+            pokemonListDiv.innerHTML = '';
             const pokemonStatsDiv = document.getElementById('pokemonStats');
-            pokemonStatsDiv.innerHTML = ''; // Limpar detalhes dos stats
+            pokemonStatsDiv.innerHTML = '';
 
-            // Obter os Pokémon da geração
             const pokemons = await getPokemonsByGeneration(geracao);
-            currentPokemons = pokemons;  // Armazenar os Pokémons carregados
+            currentPokemons = pokemons;
 
-            // Exibir os Pokémons na tela
             pokemons.forEach(async (pokemon) => {
                 const pokemonLink = document.createElement('a');
                 pokemonLink.href = '#';
                 pokemonLink.classList.add('pokemon-item');
 
-                // Buscar dados do Pokémon
                 const pokemonData = await fetch(`${BASE_URL}pokemon/${pokemon.name}`)
                     .then(response => response.json());
 
-                // Criar um elemento de imagem para o Pokémon
                 const pokemonImage = document.createElement('img');
                 pokemonImage.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${pokemonData.id}.png`;
                 pokemonImage.alt = pokemon.name;
 
-                // Adicionar nome do Pokémon ao lado da imagem
                 const pokemonNameElement = document.createElement('div');
                 pokemonNameElement.classList.add('pokemon-name');
                 pokemonNameElement.textContent = pokemon.name;
 
-                // Adicionar ID do Pokémon
                 const pokemonId = document.createElement('div');
                 pokemonId.classList.add('pokemon-id');
                 pokemonId.textContent = `#${pokemonData.id}`;
@@ -243,22 +188,18 @@
                 pokemonLink.appendChild(pokemonNameElement);
                 pokemonLink.appendChild(pokemonId);
 
-                // Adiciona um evento de clique para exibir os detalhes dos stats
                 pokemonLink.addEventListener('click', () => mostrarStats(pokemon.name));
 
                 pokemonListDiv.appendChild(pokemonLink);
             });
         }
 
-        // Função para exibir os stats do Pokémon clicado
         async function mostrarStats(pokemonName) {
             const pokemonStatsDiv = document.getElementById('pokemonStats');
             
-            // Buscar dados do Pokémon
             const pokemonData = await fetch(`${BASE_URL}pokemon/${pokemonName}`)
                 .then(response => response.json());
 
-            // Extrair stats
             const stats = pokemonData.stats.reduce((acc, stat) => {
                 if (stat.stat.name === 'special-attack') {
                     acc['special-attack'] = stat.base_stat;
@@ -270,7 +211,8 @@
                 return acc;
             }, {});
 
-            // Exibir os stats
+            const abilities = pokemonData.abilities.map(ability => ability.ability.name);
+
             pokemonStatsDiv.innerHTML = `
                 <div class="stat-title">Stats de ${pokemonName.charAt(0).toUpperCase() + pokemonName.slice(1)}</div>
                 <div class="stat-info">HP: ${stats.hp}</div>
@@ -280,10 +222,13 @@
                 <div class="stat-info">Special Defense: ${stats['special-defense'] || 'N/A'}</div>
                 <div class="stat-info">Speed: ${stats.speed}</div>
                 <div class="stat-info">Base Stat Total: ${Object.values(stats).reduce((a, b) => a + b, 0)}</div>
+                <div class="stat-info"><strong>Habilidades:</strong></div>
+                <ul>
+                    ${abilities.map(ability => `<li>${ability}</li>`).join('')}
+                </ul>
             `;
         }
 
-        // Função para filtrar Pokémons com base no nome
         function searchPokemons() {
             const searchQuery = document.getElementById('searchBox').value.toLowerCase();
             const filteredPokemons = currentPokemons.filter(pokemon =>
@@ -292,7 +237,6 @@
             renderPokemonList(filteredPokemons);
         }
 
-        // Função para renderizar a lista de Pokémons
         function renderPokemonList(pokemons) {
             const pokemonListDiv = document.getElementById('pokemonList');
             pokemonListDiv.innerHTML = '';
@@ -327,16 +271,13 @@
             });
         }
 
-        // Inicializar com a Geração 1
         mostrarPokemons(1);
 
-        // Atualizar a lista de acordo com a seleção da geração
         document.getElementById('generation').addEventListener('change', function () {
             const geracaoSelecionada = parseInt(this.value);
             mostrarPokemons(geracaoSelecionada);
         });
 
-        // Adicionar evento para a pesquisa
         document.getElementById('searchBox').addEventListener('input', searchPokemons);
     </script>
 </body>
