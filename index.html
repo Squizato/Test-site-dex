@@ -140,6 +140,28 @@
             font-size: 1.2em;
             margin: 20px;
         }
+        #movesList table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+}
+
+#movesList th {
+    background-color: #444;
+    padding: 8px;
+    text-align: left;
+    position: sticky;
+    top: 0;
+}
+
+#movesList td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #333;
+}
+
+#movesList tr:hover {
+    background-color: #3a3a3a;
+}
     </style>
 </head>
 <body>
@@ -334,10 +356,7 @@
     // Busca informações da espécie para obter variedades (formas regionais)
     let speciesData = null;
     try {
-        // Usa o ID do Pokémon padrão (ou nome) para buscar a espécie
-        const speciesId = pokemonData.id; // Pode não funcionar para formas regionais, então vamos usar o nome base
-        // Melhor: buscar species pelo nome do Pokémon base (ex: "ninetales" em vez de "ninetales-alola")
-        const baseName = pokemonName.split('-')[0]; // pega a parte antes do traço
+        const baseName = pokemonName.split('-')[0];
         speciesData = await fetchWithTimeout(`${BASE_URL}pokemon-species/${baseName}`);
     } catch (error) {
         console.warn('Não foi possível carregar variedades:', error);
@@ -360,24 +379,76 @@
 
     const totalStats = Object.values(stats).reduce((a, b) => a + b, 0);
 
-    // Gerar botões de variedades (formas regionais)
-    let varietiesHtml = '';
-    if (speciesData && speciesData.varieties && speciesData.varieties.length > 1) {
-        const varieties = speciesData.varieties.filter(v => v.pokemon.name !== pokemonData.name);
-        if (varieties.length > 0) {
-            varietiesHtml = '<div style="margin: 15px 0;"><strong>Formas regionais:</strong><div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 10px;">';
-            varieties.forEach(v => {
-                const varietyName = v.pokemon.name;
-                // Extrair nome bonito (ex: "ninetales-alola" -> "Alola")
-                let displayName = varietyName.split('-').pop();
-                displayName = displayName.charAt(0).toUpperCase() + displayName.slice(1);
-                varietiesHtml += `<button class="type-button variety-btn" data-variety="${varietyName}" style="background-color: #555; cursor: pointer;">${displayName}</button>`;
-            });
-            varietiesHtml += '</div></div>';
-        }
+    // --- Processar movimentos (learnsets) ---
+    // Mapear nomes de grupos de versão para nomes amigáveis
+    const versionGroupNames = {
+        'red-blue': 'Red/Blue',
+        'yellow': 'Yellow',
+        'gold-silver': 'Gold/Silver',
+        'crystal': 'Crystal',
+        'ruby-sapphire': 'Ruby/Sapphire',
+        'emerald': 'Emerald',
+        'firered-leafgreen': 'FireRed/LeafGreen',
+        'diamond-pearl': 'Diamond/Pearl',
+        'platinum': 'Platinum',
+        'heartgold-soulsilver': 'HeartGold/SoulSilver',
+        'black-white': 'Black/White',
+        'colosseum': 'Colosseum',
+        'xd': 'XD',
+        'black-2-white-2': 'Black 2/White 2',
+        'x-y': 'X/Y',
+        'omega-ruby-alpha-sapphire': 'Omega Ruby/Alpha Sapphire',
+        'sun-moon': 'Sun/Moon',
+        'ultra-sun-ultra-moon': 'Ultra Sun/Ultra Moon',
+        'lets-go-pikachu-lets-go-eevee': "Let's Go Pikachu/Eevee",
+        'sword-shield': 'Sword/Shield',
+        'the-isle-of-armor': 'Isle of Armor',
+        'the-crown-tundra': 'Crown Tundra',
+        'brilliant-diamond-and-shining-pearl': 'Brilliant Diamond/Shining Pearl',
+        'legends-arceus': 'Legends: Arceus',
+        'scarlet-violet': 'Scarlet/Violet',
+        'the-teal-mask': 'Teal Mask',
+        'the-indigo-disk': 'Indigo Disk'
+    };
+
+    // Coletar todos os grupos de versão únicos presentes nos movimentos
+    let versionGroups = new Set();
+    pokemonData.moves.forEach(move => {
+        move.version_group_details.forEach(detail => {
+            versionGroups.add(detail.version_group.name);
+        });
+    });
+
+    // Converter para array e ordenar (por ordem de geração, aproximadamente)
+    const sortedVersionGroups = Array.from(versionGroups).sort((a, b) => {
+        // Uma ordenação simples baseada na ordem aproximada de lançamento
+        const order = [
+            'red-blue', 'yellow', 'gold-silver', 'crystal', 'ruby-sapphire', 'emerald',
+            'firered-leafgreen', 'diamond-pearl', 'platinum', 'heartgold-soulsilver',
+            'black-white', 'black-2-white-2', 'x-y', 'omega-ruby-alpha-sapphire',
+            'sun-moon', 'ultra-sun-ultra-moon', 'lets-go-pikachu-lets-go-eevee',
+            'sword-shield', 'the-isle-of-armor', 'the-crown-tundra',
+            'brilliant-diamond-and-shining-pearl', 'legends-arceus',
+            'scarlet-violet', 'the-teal-mask', 'the-indigo-disk'
+        ];
+        return order.indexOf(a) - order.indexOf(b);
+    });
+
+    // Gerar opções do seletor de jogos
+    let gameSelectorHtml = '';
+    if (sortedVersionGroups.length > 0) {
+        gameSelectorHtml = `
+            <div style="margin: 20px 0;">
+                <label for="gameSelect" style="display: block; margin-bottom: 8px;"><strong>Selecione o jogo para ver os movimentos:</strong></label>
+                <select id="gameSelect" style="padding: 8px; background-color: #333; color: white; border: 1px solid #555; border-radius: 5px; width: 100%; max-width: 300px;">
+                    ${sortedVersionGroups.map(vg => `<option value="${vg}">${versionGroupNames[vg] || vg}</option>`).join('')}
+                </select>
+            </div>
+            <div id="movesList" style="margin-top: 20px; max-height: 300px; overflow-y: auto; background-color: #2a2a2a; padding: 10px; border-radius: 5px; text-align: left;"></div>
+        `;
     }
 
-    // Montar HTML principal
+    // --- Montar HTML principal ---
     pokemonStatsDiv.innerHTML = `
         <div class="stat-title">${pokemonData.name.charAt(0).toUpperCase() + pokemonData.name.slice(1)} ${varietyName ? `(${varietyName.split('-').pop()})` : ''}</div>
         <div class="stat-info">
@@ -385,7 +456,7 @@
             <strong>${pokemonData.name.charAt(0).toUpperCase() + pokemonData.name.slice(1)}</strong>
         </div>
         <div class="stat-types">${typeButtons}</div>
-        ${varietiesHtml}
+        ${speciesData && speciesData.varieties && speciesData.varieties.length > 1 ? gerarBotoesVariedades(speciesData, pokemonData.name, pokemonName) : ''}
         <div class="stat-info">HP: ${stats.hp || 0}</div>
         <div class="stat-info">Attack: ${stats.attack || 0}</div>
         <div class="stat-info">Defense: ${stats.defense || 0}</div>
@@ -403,15 +474,85 @@
             <img src="${shinySprite}" alt="${pokemonData.name} shiny" style="width: 100px; height: 100px; margin-top: 10px;">
         </div>
         ` : ''}
+        ${gameSelectorHtml}
     `;
 
-    // Adicionar eventos aos botões de variedade
+    // --- Adicionar eventos ---
+    // Botões de variedade (formas regionais)
     document.querySelectorAll('.variety-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const variety = btn.dataset.variety;
-            mostrarStats(pokemonName, variety); // chama a si mesma com a variedade
+            mostrarStats(pokemonName, variety);
         });
     });
+
+    // Seletor de jogos
+    const gameSelect = document.getElementById('gameSelect');
+    const movesDiv = document.getElementById('movesList');
+    if (gameSelect && movesDiv) {
+        // Função para carregar movimentos do jogo selecionado
+        function loadMovesForGame(gameVersion) {
+            const moves = pokemonData.moves.filter(move => 
+                move.version_group_details.some(detail => detail.version_group.name === gameVersion)
+            );
+
+            if (moves.length === 0) {
+                movesDiv.innerHTML = '<p>Nenhum movimento encontrado para este jogo.</p>';
+                return;
+            }
+
+            // Ordenar por nível (para level-up) ou alfabeticamente
+            moves.sort((a, b) => {
+                const aDetail = a.version_group_details.find(d => d.version_group.name === gameVersion);
+                const bDetail = b.version_group_details.find(d => d.version_group.name === gameVersion);
+                const aLevel = aDetail.level_learned_at || 0;
+                const bLevel = bDetail.level_learned_at || 0;
+                if (aLevel !== bLevel) return aLevel - bLevel;
+                return a.move.name.localeCompare(b.move.name);
+            });
+
+            let movesHtml = '<table style="width: 100%; border-collapse: collapse;">';
+            movesHtml += '<tr><th>Movimento</th><th>Método</th><th>Nível</th></tr>';
+            moves.forEach(move => {
+                const detail = move.version_group_details.find(d => d.version_group.name === gameVersion);
+                const method = detail.move_learn_method.name.replace('-', ' ');
+                const level = detail.level_learned_at || '-';
+                movesHtml += `
+                    <tr>
+                        <td style="padding: 4px; border-bottom: 1px solid #444;">${move.move.name}</td>
+                        <td style="padding: 4px; border-bottom: 1px solid #444; text-transform: capitalize;">${method}</td>
+                        <td style="padding: 4px; border-bottom: 1px solid #444; text-align: center;">${level}</td>
+                    </tr>
+                `;
+            });
+            movesHtml += '</table>';
+            movesDiv.innerHTML = movesHtml;
+        }
+
+        // Carregar movimentos do primeiro jogo ao iniciar
+        loadMovesForGame(gameSelect.value);
+
+        // Atualizar ao mudar o jogo
+        gameSelect.addEventListener('change', () => {
+            loadMovesForGame(gameSelect.value);
+        });
+    }
+
+// Função auxiliar para gerar botões de variedades (separada para organização)
+function gerarBotoesVariedades(speciesData, currentPokemonName, originalPokemonName) {
+    const varieties = speciesData.varieties.filter(v => v.pokemon.name !== currentPokemonName);
+    if (varieties.length === 0) return '';
+
+    let html = '<div style="margin: 15px 0;"><strong>Formas regionais:</strong><div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 10px;">';
+    varieties.forEach(v => {
+        const varietyName = v.pokemon.name;
+        let displayName = varietyName.split('-').pop();
+        displayName = displayName.charAt(0).toUpperCase() + displayName.slice(1);
+        html += `<button class="type-button variety-btn" data-variety="${varietyName}" style="background-color: #555; cursor: pointer;">${displayName}</button>`;
+    });
+    html += '</div></div>';
+    return html;
+}
 }
 
         function searchPokemons() {
