@@ -455,13 +455,14 @@
     const sortedVersionGroups = Array.from(versionGroups).sort((a, b) => {
         // Uma ordenação simples baseada na ordem aproximada de lançamento
         const order = [
-            'red-blue', 'yellow', 'gold-silver', 'crystal', 'ruby-sapphire', 'emerald',
-            'firered-leafgreen', 'diamond-pearl', 'platinum', 'heartgold-soulsilver',
-            'black-white', 'black-2-white-2', 'x-y', 'omega-ruby-alpha-sapphire',
-            'sun-moon', 'ultra-sun-ultra-moon', 'lets-go-pikachu-lets-go-eevee',
-            'sword-shield', 'the-isle-of-armor', 'the-crown-tundra',
-            'brilliant-diamond-and-shining-pearl', 'legends-arceus',
-            'scarlet-violet', 'the-teal-mask', 'the-indigo-disk'
+
+            'RED-BLUE', 'YELLOW', 'GOLD-SILVER', 'CRYSTAL', 'RUBY-SAPPHIRE', 'EMERALD',
+            'FIRERED-LEAFGREEN', 'DIAMOND-PEARL', 'PLATINUM', 'HEARTGOLD-SOULSILVER',
+            'BLACK-WHITE', 'BLACK-2-WHITE-2', 'X-Y', 'OMEGA-RUBY-ALPHA-SAPPHIRE',
+            'SUN-MOON', 'ULTRA-SUN-ULTRA-MOON', 'LETS-GO-PIKACHU-LETS-GO-EEVEE',
+            'SWORD-SHIELD', 'THE-ISLE-OF-ARMOR', 'THE-CROWN-TUNDRA',
+            'BRILLIANT-DIAMOND-AND-SHINING-PEARL', 'LEGENDS-ARCEUS',
+            'SCARLET-VIOLET', 'THE-TEAL-MASK', 'THE-INDIGO-DISK'
         ];
         return order.indexOf(a) - order.indexOf(b);
     });
