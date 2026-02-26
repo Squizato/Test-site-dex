@@ -95,6 +95,32 @@
             color: #999;
         }
 
+        .type-container {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .type-button {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: white;
+            text-shadow: 1px 1px 2px black;
+            border: none;
+            cursor: default;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            transition: transform 0.2s;
+        }
+
+        .type-button:hover {
+            transform: scale(1.05);
+        }
+
         .stat-container {
             margin-top: 20px;
             background-color: #222;
@@ -112,6 +138,13 @@
 
         .stat-info {
             font-size: 1.2em;
+        }
+
+        .stat-types {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 15px 0;
         }
     </style>
 </head>
@@ -139,19 +172,47 @@
 
     <script>
         const BASE_URL = "https://pokeapi.co/api/v2/";
-        let currentPokemons = [];
+        let currentPokemons = []; // Array de objetos { name, id, types, data? }
+
+        // Mapeamento de cores para os tipos
+        const typeColors = {
+            normal: '#A8A77A',
+            fire: '#EE8130',
+            water: '#6390F0',
+            electric: '#F7D02C',
+            grass: '#7AC74C',
+            ice: '#96D9D6',
+            fighting: '#C22E28',
+            poison: '#A33EA1',
+            ground: '#E2BF65',
+            flying: '#A98FF3',
+            psychic: '#F95587',
+            bug: '#A6B91A',
+            rock: '#B6A136',
+            ghost: '#735797',
+            dragon: '#6F35FC',
+            dark: '#705746',
+            steel: '#B7B7CE',
+            fairy: '#D685AD',
+            stellar: '#40B5A5',   // caso apareça
+            unknown: '#68A090'
+        };
 
         async function getPokemonsByGeneration(generation) {
-            const generationData = await fetch(`${BASE_URL}generation/${generation}/`)
+            const generationData = await fetch(${BASE_URL}generation/${generation}/)
                 .then(response => response.json());
 
             let pokemons = [];
             for (let pokemon of generationData.pokemon_species) {
-                const pokemonData = await fetch(pokemon.url)
-                    .then(response => response.json())
-                    .then(data => {
-                        pokemons.push({ name: pokemon.name, id: data.id });
-                    });
+                // Buscar dados detalhados do pokemon para obter id e tipos
+                const pokemonDetail = await fetch(${BASE_URL}pokemon/${pokemon.name})
+                    .then(res => res.json());
+                pokemons.push({
+                    name: pokemon.name,
+                    id: pokemonDetail.id,
+                    types: pokemonDetail.types.map(t => t.type.name),
+                    data: pokemonDetail // opcional, guarda tudo
+                });
             }
             return pokemons;
         }
@@ -164,17 +225,20 @@
 
             const pokemons = await getPokemonsByGeneration(geracao);
             currentPokemons = pokemons;
+            renderPokemonList(pokemons);
+        }
 
-            pokemons.forEach(async (pokemon) => {
+        function renderPokemonList(pokemons) {
+            const pokemonListDiv = document.getElementById('pokemonList');
+            pokemonListDiv.innerHTML = '';
+
+            pokemons.forEach(pokemon => {
                 const pokemonLink = document.createElement('a');
                 pokemonLink.href = '#';
                 pokemonLink.classList.add('pokemon-item');
 
-                const pokemonData = await fetch(`${BASE_URL}pokemon/${pokemon.name}`)
-                    .then(response => response.json());
-
                 const pokemonImage = document.createElement('img');
-                pokemonImage.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${pokemonData.id}.png`;
+                pokemonImage.src = https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${pokemon.id}.png;
                 pokemonImage.alt = pokemon.name;
 
                 const pokemonNameElement = document.createElement('div');
@@ -183,13 +247,27 @@
 
                 const pokemonId = document.createElement('div');
                 pokemonId.classList.add('pokemon-id');
-                pokemonId.textContent = `#${pokemonData.id}`;
+                pokemonId.textContent = #${pokemon.id};
+
+                const typeContainer = document.createElement('div');
+                typeContainer.classList.add('type-container');
+                pokemon.types.forEach(type => {
+                    const typeBtn = document.createElement('span');
+                    typeBtn.classList.add('type-button');
+                    typeBtn.textContent = type;
+                    typeBtn.style.backgroundColor = typeColors[type] || '#777';
+                    typeContainer.appendChild(typeBtn);
+                });
 
                 pokemonLink.appendChild(pokemonImage);
                 pokemonLink.appendChild(pokemonNameElement);
                 pokemonLink.appendChild(pokemonId);
+                pokemonLink.appendChild(typeContainer);
 
-                pokemonLink.addEventListener('click', () => mostrarStats(pokemon.name));
+                pokemonLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    mostrarStats(pokemon.name);
+                });
 
                 pokemonListDiv.appendChild(pokemonLink);
             });
@@ -198,24 +276,27 @@
         async function mostrarStats(pokemonName) {
             const pokemonStatsDiv = document.getElementById('pokemonStats');
             
-            const pokemonData = await fetch(`${BASE_URL}pokemon/${pokemonName}`)
-                .then(response => response.json());
+            // Tenta pegar do cache ou busca novamente
+            let pokemonData = currentPokemons.find(p => p.name === pokemonName)?.data;
+            if (!pokemonData) {
+                pokemonData = await fetch(${BASE_URL}pokemon/${pokemonName}).then(res => res.json());
+            }
 
             const stats = pokemonData.stats.reduce((acc, stat) => {
-                if (stat.stat.name === 'special-attack') {
-                    acc['special-attack'] = stat.base_stat;
-                } else if (stat.stat.name === 'special-defense') {
-                    acc['special-defense'] = stat.base_stat;
-                } else {
-                    acc[stat.stat.name] = stat.base_stat;
-                }
+                acc[stat.stat.name] = stat.base_stat;
                 return acc;
             }, {});
 
             const abilities = pokemonData.abilities.map(ability => ability.ability.name);
+            const types = pokemonData.types.map(t => t.type.name);
 
             const normalSprite = pokemonData.sprites.front_default;
             const shinySprite = pokemonData.sprites.front_shiny;
+
+            // Gerar botões de tipos para a seção de stats
+            const typeButtons = types.map(type => 
+                <span class="type-button" style="background-color: ${typeColors[type] || '#777'}">${type}</span>
+            ).join('');
 
             pokemonStatsDiv.innerHTML = `
                 <div class="stat-title">Stats de ${pokemonName.charAt(0).toUpperCase() + pokemonName.slice(1)}</div>
@@ -223,6 +304,7 @@
                     <img src="${normalSprite}" alt="${pokemonName} normal" style="width: 100px; height: 100px; margin-right: 10px; vertical-align: middle;">
                     <strong>${pokemonName.charAt(0).toUpperCase() + pokemonName.slice(1)}</strong>
                 </div>
+                <div class="stat-types">${typeButtons}</div>
                 <div class="stat-info">HP: ${stats.hp}</div>
                 <div class="stat-info">Attack: ${stats.attack}</div>
                 <div class="stat-info">Defense: ${stats.defense}</div>
@@ -232,7 +314,7 @@
                 <div class="stat-info">Base Stat Total: ${Object.values(stats).reduce((a, b) => a + b, 0)}</div>
                 <div class="stat-info"><strong>Habilidades:</strong></div>
                 <ul>
-                    ${abilities.map(ability => `<li>${ability}</li>`).join('')}
+                    ${abilities.map(ability => <li>${ability}</li>).join('')}
                 </ul>
                 <div class="stat-info">
                     <strong>Sprite Shiny:</strong>
@@ -249,40 +331,7 @@
             renderPokemonList(filteredPokemons);
         }
 
-        function renderPokemonList(pokemons) {
-            const pokemonListDiv = document.getElementById('pokemonList');
-            pokemonListDiv.innerHTML = '';
-
-            pokemons.forEach(async (pokemon) => {
-                const pokemonLink = document.createElement('a');
-                pokemonLink.href = '#';
-                pokemonLink.classList.add('pokemon-item');
-
-                const pokemonData = await fetch(`${BASE_URL}pokemon/${pokemon.name}`)
-                    .then(response => response.json());
-
-                const pokemonImage = document.createElement('img');
-                pokemonImage.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${pokemonData.id}.png`;
-                pokemonImage.alt = pokemon.name;
-
-                const pokemonNameElement = document.createElement('div');
-                pokemonNameElement.classList.add('pokemon-name');
-                pokemonNameElement.textContent = pokemon.name;
-
-                const pokemonId = document.createElement('div');
-                pokemonId.classList.add('pokemon-id');
-                pokemonId.textContent = `#${pokemonData.id}`;
-
-                pokemonLink.appendChild(pokemonImage);
-                pokemonLink.appendChild(pokemonNameElement);
-                pokemonLink.appendChild(pokemonId);
-
-                pokemonLink.addEventListener('click', () => mostrarStats(pokemon.name));
-
-                pokemonListDiv.appendChild(pokemonLink);
-            });
-        }
-
+        // Inicializa com a geração 1
         mostrarPokemons(1);
 
         document.getElementById('generation').addEventListener('change', function () {
