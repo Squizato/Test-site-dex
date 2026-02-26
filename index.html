@@ -15,18 +15,15 @@
             flex-direction: column;
             align-items: center;
         }
-
         h1 {
             text-align: center;
             margin-bottom: 20px;
             font-size: 2.5em;
         }
-
         label {
             font-size: 1.2em;
             margin-bottom: 10px;
         }
-
         select {
             padding: 10px;
             font-size: 1em;
@@ -36,7 +33,6 @@
             border-radius: 5px;
             margin-bottom: 20px;
         }
-
         #searchBox {
             padding: 10px;
             width: 80%;
@@ -49,7 +45,6 @@
             border-radius: 5px;
             text-align: center;
         }
-
         .pokemon-list {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -58,7 +53,6 @@
             width: 100%;
             max-width: 1200px;
         }
-
         .pokemon-item {
             background: linear-gradient(145deg, #333, #444);
             padding: 20px;
@@ -71,30 +65,25 @@
             text-decoration: none;
             overflow: hidden;
         }
-
         .pokemon-item:hover {
             transform: scale(1.05);
             box-shadow: 0 6px 15px rgba(0, 0, 0, 0.5);
         }
-
         .pokemon-item img {
             width: 100px;
             height: 100px;
             margin-bottom: 10px;
         }
-
         .pokemon-name {
             font-size: 1.5em;
             margin: 10px 0;
             text-transform: capitalize;
             font-weight: bold;
         }
-
         .pokemon-id {
             font-size: 1.1em;
             color: #999;
         }
-
         .type-container {
             display: flex;
             justify-content: center;
@@ -102,7 +91,6 @@
             margin-top: 10px;
             flex-wrap: wrap;
         }
-
         .type-button {
             padding: 5px 12px;
             border-radius: 20px;
@@ -116,11 +104,9 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.3);
             transition: transform 0.2s;
         }
-
         .type-button:hover {
             transform: scale(1.05);
         }
-
         .stat-container {
             margin-top: 20px;
             background-color: #222;
@@ -130,21 +116,29 @@
             width: 100%;
             max-width: 500px;
         }
-
         .stat-title {
             font-size: 1.5em;
             margin-bottom: 10px;
         }
-
         .stat-info {
             font-size: 1.2em;
         }
-
         .stat-types {
             display: flex;
             justify-content: center;
             gap: 10px;
             margin: 15px 0;
+        }
+        .loading {
+            text-align: center;
+            font-size: 1.5em;
+            margin: 20px;
+        }
+        .error-message {
+            color: #ff6b6b;
+            text-align: center;
+            font-size: 1.2em;
+            margin: 20px;
         }
     </style>
 </head>
@@ -168,13 +162,15 @@
 
     <div id="pokemonStats" class="stat-container"></div>
 
+    <div id="loadingMessage" class="loading">Carregando...</div>
+    <div id="errorMessage" class="error-message" style="display: none;"></div>
+
     <div class="pokemon-list" id="pokemonList"></div>
 
     <script>
         const BASE_URL = "https://pokeapi.co/api/v2/";
-        let currentPokemons = []; // Array de objetos { name, id, types, data? }
+        let currentPokemons = []; // Array de objetos { name, id, types, data }
 
-        // Mapeamento de cores para os tipos
         const typeColors = {
             normal: '#A8A77A',
             fire: '#EE8130',
@@ -194,43 +190,90 @@
             dark: '#705746',
             steel: '#B7B7CE',
             fairy: '#D685AD',
-            stellar: '#40B5A5',   // caso apareça
+            stellar: '#40B5A5',
             unknown: '#68A090'
         };
 
-        async function getPokemonsByGeneration(generation) {
-            const generationData = await fetch(${BASE_URL}generation/${generation}/)
-                .then(response => response.json());
+        // Elementos DOM
+        const pokemonListDiv = document.getElementById('pokemonList');
+        const pokemonStatsDiv = document.getElementById('pokemonStats');
+        const loadingDiv = document.getElementById('loadingMessage');
+        const errorDiv = document.getElementById('errorMessage');
+        const generationSelect = document.getElementById('generation');
+        const searchBox = document.getElementById('searchBox');
 
-            let pokemons = [];
-            for (let pokemon of generationData.pokemon_species) {
-                // Buscar dados detalhados do pokemon para obter id e tipos
-                const pokemonDetail = await fetch(${BASE_URL}pokemon/${pokemon.name})
-                    .then(res => res.json());
-                pokemons.push({
-                    name: pokemon.name,
-                    id: pokemonDetail.id,
-                    types: pokemonDetail.types.map(t => t.type.name),
-                    data: pokemonDetail // opcional, guarda tudo
-                });
+        async function fetchWithTimeout(url, timeout = 10000) {
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), timeout);
+            try {
+                const response = await fetch(url, { signal: controller.signal });
+                clearTimeout(id);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                return await response.json();
+            } catch (error) {
+                clearTimeout(id);
+                throw error;
             }
-            return pokemons;
+        }
+
+        async function getPokemonsByGeneration(generation) {
+            try {
+                // Busca dados da geração
+                const generationData = await fetchWithTimeout(`${BASE_URL}generation/${generation}/`);
+                
+                let pokemons = [];
+                // Processa em lotes para não sobrecarregar
+                const speciesList = generationData.pokemon_species;
+                
+                for (let i = 0; i < speciesList.length; i++) {
+                    const pokemon = speciesList[i];
+                    try {
+                        const pokemonDetail = await fetchWithTimeout(`${BASE_URL}pokemon/${pokemon.name}`);
+                        pokemons.push({
+                            name: pokemon.name,
+                            id: pokemonDetail.id,
+                            types: pokemonDetail.types.map(t => t.type.name),
+                            data: pokemonDetail
+                        });
+                    } catch (e) {
+                        console.warn(`Erro ao carregar ${pokemon.name}:`, e);
+                        // Continua mesmo se um falhar
+                    }
+                }
+                return pokemons;
+            } catch (error) {
+                console.error('Erro ao carregar geração:', error);
+                throw error;
+            }
         }
 
         async function mostrarPokemons(geracao) {
-            const pokemonListDiv = document.getElementById('pokemonList');
+            // Limpa tudo
             pokemonListDiv.innerHTML = '';
-            const pokemonStatsDiv = document.getElementById('pokemonStats');
             pokemonStatsDiv.innerHTML = '';
+            errorDiv.style.display = 'none';
+            loadingDiv.style.display = 'block';
 
-            const pokemons = await getPokemonsByGeneration(geracao);
-            currentPokemons = pokemons;
-            renderPokemonList(pokemons);
+            try {
+                const pokemons = await getPokemonsByGeneration(geracao);
+                currentPokemons = pokemons;
+                renderPokemonList(pokemons);
+                loadingDiv.style.display = 'none';
+            } catch (error) {
+                loadingDiv.style.display = 'none';
+                errorDiv.style.display = 'block';
+                errorDiv.textContent = 'Erro ao carregar os Pokémon. Tente novamente mais tarde.';
+                console.error(error);
+            }
         }
 
         function renderPokemonList(pokemons) {
-            const pokemonListDiv = document.getElementById('pokemonList');
             pokemonListDiv.innerHTML = '';
+
+            if (pokemons.length === 0) {
+                pokemonListDiv.innerHTML = '<div style="text-align: center; width: 100%;">Nenhum Pokémon encontrado.</div>';
+                return;
+            }
 
             pokemons.forEach(pokemon => {
                 const pokemonLink = document.createElement('a');
@@ -238,8 +281,9 @@
                 pokemonLink.classList.add('pokemon-item');
 
                 const pokemonImage = document.createElement('img');
-                pokemonImage.src = https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${pokemon.id}.png;
+                pokemonImage.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${pokemon.id}.png`;
                 pokemonImage.alt = pokemon.name;
+                pokemonImage.onerror = () => { pokemonImage.src = 'https://via.placeholder.com/100?text=No+Image'; };
 
                 const pokemonNameElement = document.createElement('div');
                 pokemonNameElement.classList.add('pokemon-name');
@@ -247,7 +291,7 @@
 
                 const pokemonId = document.createElement('div');
                 pokemonId.classList.add('pokemon-id');
-                pokemonId.textContent = #${pokemon.id};
+                pokemonId.textContent = `#${pokemon.id}`;
 
                 const typeContainer = document.createElement('div');
                 typeContainer.classList.add('type-container');
@@ -274,12 +318,14 @@
         }
 
         async function mostrarStats(pokemonName) {
-            const pokemonStatsDiv = document.getElementById('pokemonStats');
-            
-            // Tenta pegar do cache ou busca novamente
             let pokemonData = currentPokemons.find(p => p.name === pokemonName)?.data;
             if (!pokemonData) {
-                pokemonData = await fetch(${BASE_URL}pokemon/${pokemonName}).then(res => res.json());
+                try {
+                    pokemonData = await fetchWithTimeout(`${BASE_URL}pokemon/${pokemonName}`);
+                } catch (error) {
+                    pokemonStatsDiv.innerHTML = '<div class="error-message">Erro ao carregar estatísticas.</div>';
+                    return;
+                }
             }
 
             const stats = pokemonData.stats.reduce((acc, stat) => {
@@ -290,56 +336,65 @@
             const abilities = pokemonData.abilities.map(ability => ability.ability.name);
             const types = pokemonData.types.map(t => t.type.name);
 
-            const normalSprite = pokemonData.sprites.front_default;
-            const shinySprite = pokemonData.sprites.front_shiny;
+            const normalSprite = pokemonData.sprites.front_default || '';
+            const shinySprite = pokemonData.sprites.front_shiny || '';
 
-            // Gerar botões de tipos para a seção de stats
             const typeButtons = types.map(type => 
-                <span class="type-button" style="background-color: ${typeColors[type] || '#777'}">${type}</span>
+                `<span class="type-button" style="background-color: ${typeColors[type] || '#777'}">${type}</span>`
             ).join('');
+
+            const totalStats = Object.values(stats).reduce((a, b) => a + b, 0);
 
             pokemonStatsDiv.innerHTML = `
                 <div class="stat-title">Stats de ${pokemonName.charAt(0).toUpperCase() + pokemonName.slice(1)}</div>
                 <div class="stat-info">
-                    <img src="${normalSprite}" alt="${pokemonName} normal" style="width: 100px; height: 100px; margin-right: 10px; vertical-align: middle;">
+                    ${normalSprite ? `<img src="${normalSprite}" alt="${pokemonName} normal" style="width: 100px; height: 100px; margin-right: 10px; vertical-align: middle;">` : ''}
                     <strong>${pokemonName.charAt(0).toUpperCase() + pokemonName.slice(1)}</strong>
                 </div>
                 <div class="stat-types">${typeButtons}</div>
-                <div class="stat-info">HP: ${stats.hp}</div>
-                <div class="stat-info">Attack: ${stats.attack}</div>
-                <div class="stat-info">Defense: ${stats.defense}</div>
-                <div class="stat-info">Special Attack: ${stats['special-attack'] || 'N/A'}</div>
-                <div class="stat-info">Special Defense: ${stats['special-defense'] || 'N/A'}</div>
-                <div class="stat-info">Speed: ${stats.speed}</div>
-                <div class="stat-info">Base Stat Total: ${Object.values(stats).reduce((a, b) => a + b, 0)}</div>
+                <div class="stat-info">HP: ${stats.hp || 0}</div>
+                <div class="stat-info">Attack: ${stats.attack || 0}</div>
+                <div class="stat-info">Defense: ${stats.defense || 0}</div>
+                <div class="stat-info">Special Attack: ${stats['special-attack'] || 0}</div>
+                <div class="stat-info">Special Defense: ${stats['special-defense'] || 0}</div>
+                <div class="stat-info">Speed: ${stats.speed || 0}</div>
+                <div class="stat-info">Base Stat Total: ${totalStats}</div>
                 <div class="stat-info"><strong>Habilidades:</strong></div>
                 <ul>
-                    ${abilities.map(ability => <li>${ability}</li>).join('')}
+                    ${abilities.map(ability => `<li>${ability}</li>`).join('')}
                 </ul>
+                ${shinySprite ? `
                 <div class="stat-info">
                     <strong>Sprite Shiny:</strong>
                     <img src="${shinySprite}" alt="${pokemonName} shiny" style="width: 100px; height: 100px; margin-top: 10px;">
                 </div>
+                ` : ''}
             `;
         }
 
         function searchPokemons() {
-            const searchQuery = document.getElementById('searchBox').value.toLowerCase();
+            const searchQuery = searchBox.value.toLowerCase().trim();
+            if (searchQuery === '') {
+                renderPokemonList(currentPokemons);
+                return;
+            }
             const filteredPokemons = currentPokemons.filter(pokemon =>
-                pokemon.name.toLowerCase().includes(searchQuery)
+                pokemon.name.toLowerCase().includes(searchQuery) ||
+                pokemon.id.toString().includes(searchQuery)
             );
             renderPokemonList(filteredPokemons);
         }
 
-        // Inicializa com a geração 1
-        mostrarPokemons(1);
-
-        document.getElementById('generation').addEventListener('change', function () {
+        // Event listeners
+        generationSelect.addEventListener('change', function () {
             const geracaoSelecionada = parseInt(this.value);
             mostrarPokemons(geracaoSelecionada);
         });
 
-        document.getElementById('searchBox').addEventListener('input', searchPokemons);
+        searchBox.addEventListener('input', searchPokemons);
+
+        // Inicializa
+        mostrarPokemons(1);
     </script>
 </body>
 </html>
