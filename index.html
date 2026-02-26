@@ -317,60 +317,102 @@
             });
         }
 
-        async function mostrarStats(pokemonName) {
-            let pokemonData = currentPokemons.find(p => p.name === pokemonName)?.data;
-            if (!pokemonData) {
-                try {
-                    pokemonData = await fetchWithTimeout(`${BASE_URL}pokemon/${pokemonName}`);
-                } catch (error) {
-                    pokemonStatsDiv.innerHTML = '<div class="error-message">Erro ao carregar estatísticas.</div>';
-                    return;
-                }
-            }
-
-            const stats = pokemonData.stats.reduce((acc, stat) => {
-                acc[stat.stat.name] = stat.base_stat;
-                return acc;
-            }, {});
-
-            const abilities = pokemonData.abilities.map(ability => ability.ability.name);
-            const types = pokemonData.types.map(t => t.type.name);
-
-            const normalSprite = pokemonData.sprites.front_default || '';
-            const shinySprite = pokemonData.sprites.front_shiny || '';
-
-            const typeButtons = types.map(type => 
-                `<span class="type-button" style="background-color: ${typeColors[type] || '#777'}">${type}</span>`
-            ).join('');
-
-            const totalStats = Object.values(stats).reduce((a, b) => a + b, 0);
-
-            pokemonStatsDiv.innerHTML = `
-                <div class="stat-title">Stats de ${pokemonName.charAt(0).toUpperCase() + pokemonName.slice(1)}</div>
-                <div class="stat-info">
-                    ${normalSprite ? `<img src="${normalSprite}" alt="${pokemonName} normal" style="width: 100px; height: 100px; margin-right: 10px; vertical-align: middle;">` : ''}
-                    <strong>${pokemonName.charAt(0).toUpperCase() + pokemonName.slice(1)}</strong>
-                </div>
-                <div class="stat-types">${typeButtons}</div>
-                <div class="stat-info">HP: ${stats.hp || 0}</div>
-                <div class="stat-info">Attack: ${stats.attack || 0}</div>
-                <div class="stat-info">Defense: ${stats.defense || 0}</div>
-                <div class="stat-info">Special Attack: ${stats['special-attack'] || 0}</div>
-                <div class="stat-info">Special Defense: ${stats['special-defense'] || 0}</div>
-                <div class="stat-info">Speed: ${stats.speed || 0}</div>
-                <div class="stat-info">Base Stat Total: ${totalStats}</div>
-                <div class="stat-info"><strong>Habilidades:</strong></div>
-                <ul>
-                    ${abilities.map(ability => `<li>${ability}</li>`).join('')}
-                </ul>
-                ${shinySprite ? `
-                <div class="stat-info">
-                    <strong>Sprite Shiny:</strong>
-                    <img src="${shinySprite}" alt="${pokemonName} shiny" style="width: 100px; height: 100px; margin-top: 10px;">
-                </div>
-                ` : ''}
-            `;
+        async function mostrarStats(pokemonName, varietyName = null) {
+    // Se varietyName for fornecido, busca a forma específica
+    const nameToFetch = varietyName || pokemonName;
+    
+    let pokemonData = currentPokemons.find(p => p.name === nameToFetch)?.data;
+    if (!pokemonData) {
+        try {
+            pokemonData = await fetchWithTimeout(`${BASE_URL}pokemon/${nameToFetch}`);
+        } catch (error) {
+            pokemonStatsDiv.innerHTML = '<div class="error-message">Erro ao carregar estatísticas.</div>';
+            return;
         }
+    }
+
+    // Busca informações da espécie para obter variedades (formas regionais)
+    let speciesData = null;
+    try {
+        // Usa o ID do Pokémon padrão (ou nome) para buscar a espécie
+        const speciesId = pokemonData.id; // Pode não funcionar para formas regionais, então vamos usar o nome base
+        // Melhor: buscar species pelo nome do Pokémon base (ex: "ninetales" em vez de "ninetales-alola")
+        const baseName = pokemonName.split('-')[0]; // pega a parte antes do traço
+        speciesData = await fetchWithTimeout(`${BASE_URL}pokemon-species/${baseName}`);
+    } catch (error) {
+        console.warn('Não foi possível carregar variedades:', error);
+    }
+
+    const stats = pokemonData.stats.reduce((acc, stat) => {
+        acc[stat.stat.name] = stat.base_stat;
+        return acc;
+    }, {});
+
+    const abilities = pokemonData.abilities.map(ability => ability.ability.name);
+    const types = pokemonData.types.map(t => t.type.name);
+
+    const normalSprite = pokemonData.sprites.front_default || '';
+    const shinySprite = pokemonData.sprites.front_shiny || '';
+
+    const typeButtons = types.map(type => 
+        `<span class="type-button" style="background-color: ${typeColors[type] || '#777'}">${type}</span>`
+    ).join('');
+
+    const totalStats = Object.values(stats).reduce((a, b) => a + b, 0);
+
+    // Gerar botões de variedades (formas regionais)
+    let varietiesHtml = '';
+    if (speciesData && speciesData.varieties && speciesData.varieties.length > 1) {
+        const varieties = speciesData.varieties.filter(v => v.pokemon.name !== pokemonData.name);
+        if (varieties.length > 0) {
+            varietiesHtml = '<div style="margin: 15px 0;"><strong>Formas regionais:</strong><div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 10px;">';
+            varieties.forEach(v => {
+                const varietyName = v.pokemon.name;
+                // Extrair nome bonito (ex: "ninetales-alola" -> "Alola")
+                let displayName = varietyName.split('-').pop();
+                displayName = displayName.charAt(0).toUpperCase() + displayName.slice(1);
+                varietiesHtml += `<button class="type-button variety-btn" data-variety="${varietyName}" style="background-color: #555; cursor: pointer;">${displayName}</button>`;
+            });
+            varietiesHtml += '</div></div>';
+        }
+    }
+
+    // Montar HTML principal
+    pokemonStatsDiv.innerHTML = `
+        <div class="stat-title">${pokemonData.name.charAt(0).toUpperCase() + pokemonData.name.slice(1)} ${varietyName ? `(${varietyName.split('-').pop()})` : ''}</div>
+        <div class="stat-info">
+            ${normalSprite ? `<img src="${normalSprite}" alt="${pokemonData.name} normal" style="width: 100px; height: 100px; margin-right: 10px; vertical-align: middle;">` : ''}
+            <strong>${pokemonData.name.charAt(0).toUpperCase() + pokemonData.name.slice(1)}</strong>
+        </div>
+        <div class="stat-types">${typeButtons}</div>
+        ${varietiesHtml}
+        <div class="stat-info">HP: ${stats.hp || 0}</div>
+        <div class="stat-info">Attack: ${stats.attack || 0}</div>
+        <div class="stat-info">Defense: ${stats.defense || 0}</div>
+        <div class="stat-info">Special Attack: ${stats['special-attack'] || 0}</div>
+        <div class="stat-info">Special Defense: ${stats['special-defense'] || 0}</div>
+        <div class="stat-info">Speed: ${stats.speed || 0}</div>
+        <div class="stat-info">Base Stat Total: ${totalStats}</div>
+        <div class="stat-info"><strong>Habilidades:</strong></div>
+        <ul>
+            ${abilities.map(ability => `<li>${ability}</li>`).join('')}
+        </ul>
+        ${shinySprite ? `
+        <div class="stat-info">
+            <strong>Sprite Shiny:</strong>
+            <img src="${shinySprite}" alt="${pokemonData.name} shiny" style="width: 100px; height: 100px; margin-top: 10px;">
+        </div>
+        ` : ''}
+    `;
+
+    // Adicionar eventos aos botões de variedade
+    document.querySelectorAll('.variety-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const variety = btn.dataset.variety;
+            mostrarStats(pokemonName, variety); // chama a si mesma com a variedade
+        });
+    });
+}
 
         function searchPokemons() {
             const searchQuery = searchBox.value.toLowerCase().trim();
