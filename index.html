@@ -162,6 +162,37 @@
 #movesList tr:hover {
     background-color: #3a3a3a;
 }
+        #movesList table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+    background-color: #222;
+}
+
+#movesList th {
+    background-color: #444;
+    padding: 8px;
+    text-align: left;
+    position: sticky;
+    top: 0;
+    color: #fff;
+}
+
+#movesList td {
+    padding: 8px;
+    border-bottom: 1px solid #333;
+}
+
+#movesList tr:hover {
+    background-color: #3a3a3a;
+}
+
+/* Estilo para a célula do tipo */
+#movesList td:first-child {
+    font-weight: bold;
+    text-transform: uppercase;
+    text-align: center;
+}
     </style>
 </head>
 <body>
@@ -217,6 +248,7 @@
         };
 
         // Elementos DOM
+        const moveCache = {}; // cache para dados dos movimentos (tipo e categoria)
         const pokemonListDiv = document.getElementById('pokemonList');
         const pokemonStatsDiv = document.getElementById('pokemonStats');
         const loadingDiv = document.getElementById('loadingMessage');
@@ -382,33 +414,33 @@
     // --- Processar movimentos (learnsets) ---
     // Mapear nomes de grupos de versão para nomes amigáveis
     const versionGroupNames = {
-        'red-blue': 'Red/Blue',
-        'yellow': 'Yellow',
-        'gold-silver': 'Gold/Silver',
-        'crystal': 'Crystal',
-        'ruby-sapphire': 'Ruby/Sapphire',
-        'emerald': 'Emerald',
-        'firered-leafgreen': 'FireRed/LeafGreen',
-        'diamond-pearl': 'Diamond/Pearl',
-        'platinum': 'Platinum',
-        'heartgold-soulsilver': 'HeartGold/SoulSilver',
-        'black-white': 'Black/White',
-        'colosseum': 'Colosseum',
-        'xd': 'XD',
-        'black-2-white-2': 'Black 2/White 2',
-        'x-y': 'X/Y',
-        'omega-ruby-alpha-sapphire': 'Omega Ruby/Alpha Sapphire',
-        'sun-moon': 'Sun/Moon',
-        'ultra-sun-ultra-moon': 'Ultra Sun/Ultra Moon',
-        'lets-go-pikachu-lets-go-eevee': "Let's Go Pikachu/Eevee",
-        'sword-shield': 'Sword/Shield',
-        'the-isle-of-armor': 'Isle of Armor',
-        'the-crown-tundra': 'Crown Tundra',
-        'brilliant-diamond-and-shining-pearl': 'Brilliant Diamond/Shining Pearl',
-        'legends-arceus': 'Legends: Arceus',
-        'scarlet-violet': 'Scarlet/Violet',
-        'the-teal-mask': 'Teal Mask',
-        'the-indigo-disk': 'Indigo Disk'
+        'Red-Blue': 'Red/Blue',
+        'Yellow': 'Yellow',
+        'Gold-Silver': 'Gold/Silver',
+        'Crystal': 'Crystal',
+        'Ruby-Sapphire': 'Ruby/Sapphire',
+        'Emerald': 'Emerald',
+        'Firered-Leafgreen': 'FireRed/LeafGreen',
+        'Diamond-Pearl': 'Diamond/Pearl',
+        'Platinum': 'Platinum',
+        'Heartgold-Soulsilver': 'HeartGold/SoulSilver',
+        'Black-White': 'Black/White',
+        'Colosseum': 'Colosseum',
+        'XD': 'XD',
+        'Black-2-White-2': 'Black 2/White 2',
+        'X-Y': 'X/Y',
+        'Omega-ruby-Alpha-sapphire': 'Omega Ruby/Alpha Sapphire',
+        'Sun-Moon': 'Sun/Moon',
+        'Ultra-sun-Ultra-moon': 'Ultra Sun/Ultra Moon',
+        'Lets-go-pikachu-Lets-go-eevee': "Let's Go Pikachu/Eevee",
+        'Sword-Shield': 'Sword/Shield',
+        'The-isle-of-armor': 'Isle of Armor',
+        'The-crown-tundra': 'Crown Tundra',
+        'Brilliant-diamond-and-Shining-pearl': 'Brilliant Diamond/Shining Pearl',
+        'Legends-arceus': 'Legends: Arceus',
+        'Scarlet-violet': 'Scarlet/Violet',
+        'The-teal-mask': 'Teal Mask',
+        'The-indigo-disk': 'Indigo Disk'
     };
 
     // Coletar todos os grupos de versão únicos presentes nos movimentos
@@ -490,51 +522,85 @@
     const gameSelect = document.getElementById('gameSelect');
     const movesDiv = document.getElementById('movesList');
     if (gameSelect && movesDiv) {
-        // Função para carregar movimentos do jogo selecionado
-        function loadMovesForGame(gameVersion) {
-            const moves = pokemonData.moves.filter(move => 
-                move.version_group_details.some(detail => detail.version_group.name === gameVersion)
-            );
+        // Função para carregar movimentos do jogo selecionado (agora assíncrona e com cores)
+async function loadMovesForGame(gameVersion) {
+    const moves = pokemonData.moves.filter(move => 
+        move.version_group_details.some(detail => detail.version_group.name === gameVersion)
+    );
 
-            if (moves.length === 0) {
-                movesDiv.innerHTML = '<p>Nenhum movimento encontrado para este jogo.</p>';
-                return;
-            }
+    if (moves.length === 0) {
+        movesDiv.innerHTML = '<p>Nenhum movimento encontrado para este jogo.</p>';
+        return;
+    }
 
-            // Ordenar por nível (para level-up) ou alfabeticamente
-            moves.sort((a, b) => {
-                const aDetail = a.version_group_details.find(d => d.version_group.name === gameVersion);
-                const bDetail = b.version_group_details.find(d => d.version_group.name === gameVersion);
-                const aLevel = aDetail.level_learned_at || 0;
-                const bLevel = bDetail.level_learned_at || 0;
-                if (aLevel !== bLevel) return aLevel - bLevel;
-                return a.move.name.localeCompare(b.move.name);
-            });
+    // Ordenar por nível (para level-up) ou alfabeticamente
+    moves.sort((a, b) => {
+        const aDetail = a.version_group_details.find(d => d.version_group.name === gameVersion);
+        const bDetail = b.version_group_details.find(d => d.version_group.name === gameVersion);
+        const aLevel = aDetail.level_learned_at || 0;
+        const bLevel = bDetail.level_learned_at || 0;
+        if (aLevel !== bLevel) return aLevel - bLevel;
+        return a.move.name.localeCompare(b.move.name);
+    });
 
-            let movesHtml = '<table style="width: 100%; border-collapse: collapse;">';
-            movesHtml += '<tr><th>Movimento</th><th>Método</th><th>Nível</th></tr>';
-            moves.forEach(move => {
-                const detail = move.version_group_details.find(d => d.version_group.name === gameVersion);
-                const method = detail.move_learn_method.name.replace('-', ' ');
-                const level = detail.level_learned_at || '-';
-                movesHtml += `
-                    <tr>
-                        <td style="padding: 4px; border-bottom: 1px solid #444;">${move.move.name}</td>
-                        <td style="padding: 4px; border-bottom: 1px solid #444; text-transform: capitalize;">${method}</td>
-                        <td style="padding: 4px; border-bottom: 1px solid #444; text-align: center;">${level}</td>
-                    </tr>
-                `;
-            });
-            movesHtml += '</table>';
-            movesDiv.innerHTML = movesHtml;
+    // Para cada movimento, buscar detalhes (tipo, categoria) usando cache
+    const moveDetailsPromises = moves.map(async (move) => {
+        if (moveCache[move.move.name]) {
+            return { ...move, detail: moveCache[move.move.name] };
         }
+        try {
+            const response = await fetch(`${BASE_URL}move/${move.move.name}`);
+            const data = await response.json();
+            moveCache[move.move.name] = {
+                type: data.type.name,
+                damage_class: data.damage_class ? data.damage_class.name : 'status'
+            };
+            return { ...move, detail: moveCache[move.move.name] };
+        } catch (e) {
+            console.warn(`Erro ao carregar movimento ${move.move.name}`);
+            return { ...move, detail: { type: 'unknown', damage_class: 'status' } };
+        }
+    });
+
+    const movesWithDetails = await Promise.all(moveDetailsPromises);
+
+    let movesHtml = '<table style="width: 100%; border-collapse: collapse;">';
+    movesHtml += '<tr><th>Tipo</th><th>Movimento</th><th>Cat.</th><th>Método</th><th>Nível</th></tr>';
+    
+    movesWithDetails.forEach(item => {
+        const detail = item.version_group_details.find(d => d.version_group.name === gameVersion);
+        const method = detail.move_learn_method.name.replace('-', ' ');
+        const level = detail.level_learned_at || '-';
+        const moveName = item.move.name;
+        const type = item.detail.type;
+        const damageClass = item.detail.damage_class;
+        
+        // Ícone para categoria (físico, especial, status)
+        let categoryIcon = '';
+        if (damageClass === 'physical') categoryIcon = '💪'; // físico
+        else if (damageClass === 'special') categoryIcon = '✨'; // especial
+        else categoryIcon = '⚪'; // status
+
+        movesHtml += `
+            <tr>
+                <td style="padding: 4px; border-bottom: 1px solid #444; background-color: ${typeColors[type] || '#777'}; color: white; text-shadow: 1px 1px 2px black; border-radius: 4px; text-align: center; font-weight: bold;">${type}</td>
+                <td style="padding: 4px; border-bottom: 1px solid #444;">${moveName}</td>
+                <td style="padding: 4px; border-bottom: 1px solid #444; text-align: center; font-size: 1.2em;">${categoryIcon}</td>
+                <td style="padding: 4px; border-bottom: 1px solid #444; text-transform: capitalize;">${method}</td>
+                <td style="padding: 4px; border-bottom: 1px solid #444; text-align: center;">${level}</td>
+            </tr>
+        `;
+    });
+    movesHtml += '</table>';
+    movesDiv.innerHTML = movesHtml;
+}
 
         // Carregar movimentos do primeiro jogo ao iniciar
         loadMovesForGame(gameSelect.value);
 
         // Atualizar ao mudar o jogo
-        gameSelect.addEventListener('change', () => {
-            loadMovesForGame(gameSelect.value);
+        gameSelect.addEventListener('change', async () => {
+    await loadMovesForGame(gameSelect.value);
         });
     }
 
